@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>花店收銀 POS</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background:#f6f8fa; }
+    h1 { margin-bottom: 10px; }
+    .card { background:#fff; border-radius:10px; padding:16px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+    .row { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
+    input, select, button { padding:8px; font-size:14px; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; }
+    th, td { border:1px solid #ddd; padding:8px; text-align:left; }
+    th { background:#fafafa; }
+    .ok { color:green; }
+    .err { color:red; white-space:pre-wrap; }
+    .small { color:#666; font-size:12px; }
+  </style>
+</head>
+<body>
+  <h1>花店收銀（POS）</h1>
+  <div class="small">API: <span id="apiUrl"></span></div>
+
+  <div class="card">
+    <h3>建立銷售單（簡化版：單一商品）</h3>
+    <div class="row">
+      <select id="sale_product"></select>
+      <input id="sale_qty" type="number" placeholder="數量 qty" />
+      <input id="sale_unit_price" type="number" placeholder="單價 unit_price" />
+      <input id="sale_note" placeholder="備註 note" />
+      <button id="btnSale">送出銷售</button>
+    </div>
+    <div id="saleMsg"></div>
+  </div>
+
+  <div class="card">
+    <h3>商品庫存快覽</h3>
+    <button id="btnReloadProducts">重新載入</button>
+    <table>
+      <thead>
+        <tr>
+          <th>product_id</th>
+          <th>product_name</th>
+          <th>stock_qty</th>
+          <th>selling_price</th>
+        </tr>
+      </thead>
+      <tbody id="productsTbody"></tbody>
+    </table>
+  </div>
+
+  <script src="./js/config.js"></script>
+  <script src="./js/api.js"></script>
+  <script>
+    document.getElementById('apiUrl').textContent = window.CONFIG.API_BASE || '(未設定)';
+    const saleProduct = document.getElementById('sale_product');
+    const productsTbody = document.getElementById('productsTbody');
+
+    function showMsg(el, ok, text) {
+      el.className = ok ? 'ok' : 'err';
+      el.textContent = text;
+    }
+
+    async function loadProducts() {
+      const data = await apiGet('getProducts');
+      const items = data.items || [];
+
+      saleProduct.innerHTML = '';
+      productsTbody.innerHTML = '';
+
+      for (const p of items) {
+        const opt = document.createElement('option');
+        opt.value = p.product_id;
+        opt.textContent = `${p.product_name} (${p.product_id})`;
+        saleProduct.appendChild(opt);
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.product_id ?? ''}</td>
+          <td>${p.product_name ?? ''}</td>
+          <td>${p.stock_qty ?? 0}</td>
+          <td>${p.selling_price ?? 0}</td>
+        `;
+        productsTbody.appendChild(tr);
+      }
+    }
+
+    document.getElementById('btnReloadProducts').addEventListener('click', async () => {
+      try { await loadProducts(); }
+      catch (e) { alert('讀取商品失敗：' + e.message); }
+    });
+
+    document.getElementById('btnSale').addEventListener('click', async () => {
+      const msgEl = document.getElementById('saleMsg');
+      try {
+        const payload = {
+          product_id: saleProduct.value,
+          qty: Number(document.getElementById('sale_qty').value),
+          unit_price: Number(document.getElementById('sale_unit_price').value),
+          note: document.getElementById('sale_note').value
+        };
+        const r = await apiPost('addSale', payload);
+        showMsg(msgEl, true, '成功：' + JSON.stringify(r));
+        await loadProducts();
+      } catch (e) {
+        showMsg(msgEl, false, '失敗：' + e.message);
+      }
+    });
+
+    (async function init() {
+      try { await loadProducts(); }
+      catch (e) { alert('初始化失敗：' + e.message); }
+    })();
+  </script>
+</body>
+</html>
