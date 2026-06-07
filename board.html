@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>花店即時看板 board</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background:#111; color:#fff; }
+    h1 { margin-bottom: 12px; }
+    .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
+    .card { background:#1d1d1d; border-radius:10px; padding:16px; }
+    .title { color:#aaa; font-size:13px; margin-bottom:6px; }
+    .value { font-size:28px; font-weight:bold; }
+    .small { color:#aaa; margin-top:8px; font-size:12px; }
+    button { margin-top:16px; padding:10px 14px; cursor:pointer; }
+    pre { background:#1d1d1d; padding:12px; border-radius:8px; overflow:auto; }
+  </style>
+</head>
+<body>
+  <h1>花店營運看板（board）</h1>
+  <div class="small">API: <span id="apiUrl"></span></div>
+
+  <div class="grid">
+    <div class="card"><div class="title">今日營收</div><div class="value" id="today_sales">-</div></div>
+    <div class="card"><div class="title">本月營收</div><div class="value" id="month_sales">-</div></div>
+    <div class="card"><div class="title">本月進貨成本</div><div class="value" id="month_purchase_cost">-</div></div>
+    <div class="card"><div class="title">本月固定成本</div><div class="value" id="month_fixed_cost">-</div></div>
+    <div class="card"><div class="title">本月預估利潤</div><div class="value" id="month_profit_est">-</div></div>
+    <div class="card"><div class="title">庫存估值</div><div class="value" id="inventory_value_est">-</div></div>
+  </div>
+
+  <button id="btnReload">手動刷新</button>
+  <div class="small">原始資料：</div>
+  <pre id="rawBox"></pre>
+
+  <script src="./js/config.js"></script>
+  <script src="./js/api.js"></script>
+  <script>
+    document.getElementById('apiUrl').textContent = window.CONFIG.API_BASE || '(未設定)';
+
+    function fmt(n) {
+      const num = Number(n || 0);
+      return num.toLocaleString('zh-TW');
+    }
+
+    async function loadDashboard() {
+      const data = await apiGet('getDashboard');
+      document.getElementById('today_sales').textContent = fmt(data.today_sales);
+      document.getElementById('month_sales').textContent = fmt(data.month_sales);
+      document.getElementById('month_purchase_cost').textContent = fmt(data.month_purchase_cost);
+      document.getElementById('month_fixed_cost').textContent = fmt(data.month_fixed_cost);
+      document.getElementById('month_profit_est').textContent = fmt(data.month_profit_est);
+      document.getElementById('inventory_value_est').textContent = fmt(data.inventory_value_est);
+      document.getElementById('rawBox').textContent = JSON.stringify(data, null, 2);
+    }
+
+    document.getElementById('btnReload').addEventListener('click', async () => {
+      try { await loadDashboard(); }
+      catch (e) { alert('讀取失敗：' + e.message); }
+    });
+
+    (async function init() {
+      try { await loadDashboard(); }
+      catch (e) { alert('初始化失敗：' + e.message); }
+      setInterval(async () => {
+        try { await loadDashboard(); } catch (_) {}
+      }, 30000);
+    })();
+  </script>
+</body>
+</html>
