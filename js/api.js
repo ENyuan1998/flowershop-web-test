@@ -12,25 +12,24 @@ async function apiGet(action, params = {}) {
     let data;
     try { data = JSON.parse(text); } catch (_) { data = { ok: false, message: '非 JSON 回應', detail: text }; }
 
-    if (!res.ok) {
-      throw new Error(`GET HTTP ${res.status} | ${data.message || ''} | ${data.detail || text}`);
-    }
-    if (!data.ok) {
-      throw new Error(`GET API錯誤 | ${data.message || ''} | ${data.detail || ''}`);
-    }
+    if (!res.ok) throw new Error(`GET HTTP ${res.status} | ${data.message || ''} | ${data.detail || text}`);
+    if (!data.ok) throw new Error(`GET API錯誤 | ${data.message || ''} | ${data.detail || ''}`);
     return data.data;
   } catch (err) {
-    console.error('[apiGet] action=', action, 'err=', err);
+    console.error('[apiGet]', action, err);
     throw err;
   }
 }
 
 async function apiPost(action, payload = {}) {
   try {
+    // 關鍵：用 text/plain 避免 CORS preflight
+    const bodyText = JSON.stringify({ action, payload });
+
     const res = await fetch(window.CONFIG.API_BASE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, payload })
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: bodyText
     });
 
     const text = await res.text();
@@ -38,15 +37,11 @@ async function apiPost(action, payload = {}) {
     let data;
     try { data = JSON.parse(text); } catch (_) { data = { ok: false, message: '非 JSON 回應', detail: text }; }
 
-    if (!res.ok) {
-      throw new Error(`POST HTTP ${res.status} | ${data.message || ''} | ${data.detail || text}`);
-    }
-    if (!data.ok) {
-      throw new Error(`POST API錯誤 | ${data.message || ''} | ${data.detail || ''}`);
-    }
+    if (!res.ok) throw new Error(`POST HTTP ${res.status} | ${data.message || ''} | ${data.detail || text}`);
+    if (!data.ok) throw new Error(`POST API錯誤 | ${data.message || ''} | ${data.detail || ''}`);
     return data.data;
   } catch (err) {
-    console.error('[apiPost] action=', action, 'payload=', payload, 'err=', err);
+    console.error('[apiPost]', action, payload, err);
     throw err;
   }
 }
