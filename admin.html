@@ -215,6 +215,12 @@
         alert('初始化失敗：' + e.message + '\n請先確認 js/config.js 的 API_BASE 是否為 /exec');
       }
     })();
-  </script>
+  window.addEventListener('unhandledrejection', (event) => {
+  console.error('[unhandledrejection]', event.reason);
+});
+window.addEventListener('error', (event) => {
+  console.error('[window.error]', event.message, event.error);
+});
+</script>
 </body>
 </html>
