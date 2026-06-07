@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>花店後台管理 admin</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background:#f7f7f7; }
+    h1 { margin-bottom: 8px; }
+    .card { background:#fff; border-radius:10px; padding:16px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+    .row { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
+    input, select, button { padding:8px; font-size:14px; }
+    button { cursor:pointer; }
+    .ok { color: green; }
+    .err { color: red; white-space: pre-wrap; }
+    table { width:100%; border-collapse:collapse; background:#fff; }
+    th, td { border:1px solid #ddd; padding:8px; text-align:left; font-size:14px; }
+    th { background:#fafafa; }
+    .small { color:#666; font-size:12px; }
+  </style>
+</head>
+<body>
+  <h1>花店後台管理（admin）</h1>
+  <div class="small">API: <span id="apiUrl"></span></div>
+
+  <div class="card">
+    <h3>1) 進貨登錄</h3>
+    <div class="row">
+      <select id="purchase_product"></select>
+      <input id="purchase_qty" type="number" placeholder="數量 qty" />
+      <input id="purchase_unit_cost" type="number" placeholder="單位成本 unit_cost" />
+      <input id="purchase_suggested_price" type="number" placeholder="建議售價 suggested_price" />
+      <input id="purchase_note" placeholder="備註 note" />
+      <button id="btnPurchase">送出進貨</button>
+    </div>
+    <div id="purchaseMsg"></div>
+  </div>
+
+  <div class="card">
+    <h3>2) 庫存調整</h3>
+    <div class="row">
+      <select id="adj_product"></select>
+      <input id="adj_qty_change" type="number" placeholder="異動量 qty_change（可負數）" />
+      <input id="adj_reason" placeholder="原因 reason (如 ADJUST/DAMAGE)" />
+      <input id="adj_note" placeholder="備註 note" />
+      <button id="btnAdjust">送出調整</button>
+    </div>
+    <div id="adjustMsg"></div>
+  </div>
+
+  <div class="card">
+    <h3>3) 固定成本（monthly_costs）</h3>
+    <div class="row">
+      <input id="cost_month" placeholder="月份 YYYY-MM" />
+      <input id="cost_name" placeholder="cost_name" />
+      <input id="cost_category" placeholder="category" />
+      <input id="cost_amount" type="number" placeholder="amount" />
+      <input id="cost_paid_date" placeholder="paid_date YYYY-MM-DD" />
+      <input id="cost_status" placeholder="status (PAID/UNPAID)" />
+      <input id="cost_note" placeholder="note" />
+      <button id="btnCost">新增固定成本</button>
+    </div>
+    <div id="costMsg"></div>
+  </div>
+
+  <div class="card">
+    <h3>4) Dashboard 快速檢視</h3>
+    <button id="btnDashboard">重新載入看板資料</button>
+    <pre id="dashboardBox"></pre>
+  </div>
+
+  <div class="card">
+    <h3>5) 商品清單（含庫存）</h3>
+    <button id="btnReloadProducts">重新載入商品</button>
+    <table>
+      <thead>
+        <tr>
+          <th>product_id</th>
+          <th>product_name</th>
+          <th>category</th>
+          <th>stock_qty</th>
+          <th>unit</th>
+          <th>selling_price</th>
+        </tr>
+      </thead>
+      <tbody id="productsTbody"></tbody>
+    </table>
+  </div>
+
+  <script src="./js/config.js"></script>
+  <script src="./js/api.js"></script>
+  <script>
+    const apiUrlEl = document.getElementById('apiUrl');
+    apiUrlEl.textContent = window.CONFIG.API_BASE || '(未設定)';
+
+    const purchaseProduct = document.getElementById('purchase_product');
+    const adjProduct = document.getElementById('adj_product');
+    const productsTbody = document.getElementById('productsTbody');
+
+    function showMsg(el, ok, text) {
+      el.className = ok ? 'ok' : 'err';
+      el.textContent = text;
+    }
+
+    async function loadProducts() {
+      const data = await apiGet('getProducts');
+      const items = data.items || [];
+
+      purchaseProduct.innerHTML = '';
+      adjProduct.innerHTML = '';
+      productsTbody.innerHTML = '';
+
+      for (const p of items) {
+        const opt1 = document.createElement('option');
+        opt1.value = p.product_id;
+        opt1.textContent = `${p.product_name} (${p.product_id})`;
+        purchaseProduct.appendChild(opt1);
+
+        const opt2 = document.createElement('option');
+        opt2.value = p.product_id;
+        opt2.textContent = `${p.product_name} (${p.product_id})`;
+        adjProduct.appendChild(opt2);
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.product_id ?? ''}</td>
+          <td>${p.product_name ?? ''}</td>
+          <td>${p.category ?? ''}</td>
+          <td>${p.stock_qty ?? 0}</td>
+          <td>${p.unit ?? ''}</td>
+          <td>${p.selling_price ?? 0}</td>
+        `;
+        productsTbody.appendChild(tr);
+      }
+    }
+
+    async function loadDashboard() {
+      const box = document.getElementById('dashboardBox');
+      const data = await apiGet('getDashboard');
+      box.textContent = JSON.stringify(data, null, 2);
+    }
+
+    document.getElementById('btnReloadProducts').addEventListener('click', async () => {
+      try { await loadProducts(); alert('商品已更新'); }
+      catch (e) { alert('讀取商品失敗：' + e.message); }
+    });
+
+    document.getElementById('btnDashboard').addEventListener('click', async () => {
+      try { await loadDashboard(); }
+      catch (e) { alert('看板讀取失敗：' + e.message); }
+    });
+
+    document.getElementById('btnPurchase').addEventListener('click', async () => {
+      const msgEl = document.getElementById('purchaseMsg');
+      try {
+        const payload = {
+          product_id: purchaseProduct.value,
+          qty: Number(document.getElementById('purchase_qty').value),
+          unit_cost: Number(document.getElementById('purchase_unit_cost').value),
+          suggested_price: Number(document.getElementById('purchase_suggested_price').value || 0),
+          note: document.getElementById('purchase_note').value
+        };
+        const r = await apiPost('addPurchase', payload);
+        showMsg(msgEl, true, '成功：' + JSON.stringify(r));
+        await loadProducts();
+        await loadDashboard();
+      } catch (e) {
+        showMsg(msgEl, false, '失敗：' + e.message);
+      }
+    });
+
+    document.getElementById('btnAdjust').addEventListener('click', async () => {
+      const msgEl = document.getElementById('adjustMsg');
+      try {
+        const payload = {
+          product_id: adjProduct.value,
+          qty_change: Number(document.getElementById('adj_qty_change').value),
+          reason: document.getElementById('adj_reason').value || 'ADJUST',
+          note: document.getElementById('adj_note').value
+        };
+        const r = await apiPost('adjustInventory', payload);
+        showMsg(msgEl, true, '成功：' + JSON.stringify(r));
+        await loadProducts();
+        await loadDashboard();
+      } catch (e) {
+        showMsg(msgEl, false, '失敗：' + e.message);
+      }
+    });
+
+    document.getElementById('btnCost').addEventListener('click', async () => {
+      const msgEl = document.getElementById('costMsg');
+      try {
+        const payload = {
+          month: document.getElementById('cost_month').value,
+          cost_name: document.getElementById('cost_name').value,
+          category: document.getElementById('cost_category').value,
+          amount: Number(document.getElementById('cost_amount').value),
+          paid_date: document.getElementById('cost_paid_date').value,
+          status: document.getElementById('cost_status').value || 'PAID',
+          note: document.getElementById('cost_note').value
+        };
+        const r = await apiPost('addFixedCost', payload);
+        showMsg(msgEl, true, '成功：' + JSON.stringify(r));
+        await loadDashboard();
+      } catch (e) {
+        showMsg(msgEl, false, '失敗：' + e.message);
+      }
+    });
+
+    (async function init() {
+      try {
+        await loadProducts();
+        await loadDashboard();
+      } catch (e) {
+        alert('初始化失敗：' + e.message + '\n請先確認 js/config.js 的 API_BASE 是否為 /exec');
+      }
+    })();
+  </script>
+</body>
+</html>
